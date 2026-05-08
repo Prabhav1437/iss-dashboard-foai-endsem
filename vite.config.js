@@ -10,9 +10,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/ai': {
-        target: 'https://api-inference.huggingface.co',
+        target: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ai/, '/models/mistralai/Mistral-7B-Instruct-v0.2'),
+        rewrite: (path) => path.replace(/^\/api\/ai/, ''),
       }
     }
   },
