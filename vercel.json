@@ -1,0 +1,23 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/ai/v1/(.*)",
+      "destination": "https://router.huggingface.co/v1/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+}
