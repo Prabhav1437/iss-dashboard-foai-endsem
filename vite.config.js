@@ -8,7 +8,12 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    // Direct API connections are used for stability
-    proxy: {}
+    proxy: {
+      '/api/ai': {
+        target: 'https://api-inference.huggingface.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ai/, '/models/mistralai/Mistral-7B-Instruct-v0.2'),
+      }
+    }
   },
 });
