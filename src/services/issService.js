@@ -7,19 +7,17 @@ const THROTTLE_LIMIT = 5000;
 const CACHE_KEY = 'iss_telemetry_cache';
 
 /**
- * Reverse Geocode coordinates using OpenStreetMap Nominatim via CORS Proxy
+ * Reverse Geocode coordinates using OpenStreetMap Nominatim
  */
 export const getNearestPlace = async (lat, lon) => {
   try {
-    // Switch to allorigins for production-grade proxy reliability
-    const targetUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    // Attempt direct fetch first
+    const res = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`, { 
+      timeout: 5000
+    });
     
-    const res = await axios.get(proxyUrl, { timeout: 5000 });
-    const data = JSON.parse(res.data.contents);
-    
-    if (data.display_name) {
-      const parts = data.display_name.split(',');
+    if (res.data.display_name) {
+      const parts = res.data.display_name.split(',');
       return parts.slice(0, 3).join(',').trim();
     }
     return "Over International Waters";
@@ -44,27 +42,25 @@ export const fetchISSNow = async () => {
   lastFetchTime = now;
 
   try {
-    // Adding timestamp for cache busting and using a reliable production proxy
-    const targetUrl = `https://api.wheretheiss.at/v1/satellites/25544?t=${Date.now()}`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-
-    const response = await axios.get(proxyUrl, { timeout: 8000 });
-    const rawData = JSON.parse(response.data.contents);
+    // DIRECT FETCH - REMOVED PROXIES
+    const response = await axios.get(`https://api.wheretheiss.at/v1/satellites/25544?t=${Date.now()}`, { 
+      timeout: 8000 
+    });
 
     const data = {
-      latitude: parseFloat(rawData.latitude),
-      longitude: parseFloat(rawData.longitude),
-      timestamp: rawData.timestamp,
-      velocity: rawData.velocity,
-      altitude: rawData.altitude,
-      visibility: rawData.visibility,
-      footprint: rawData.footprint
+      latitude: parseFloat(response.data.latitude),
+      longitude: parseFloat(response.data.longitude),
+      timestamp: response.data.timestamp,
+      velocity: response.data.velocity,
+      altitude: response.data.altitude,
+      visibility: response.data.visibility,
+      footprint: response.data.footprint
     };
 
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     return data;
   } catch (error) {
-    console.error('ISS Telemetry Error:', error);
+    console.error('ISS Telemetry Error (Direct):', error);
     const cached = localStorage.getItem(CACHE_KEY);
     return cached ? JSON.parse(cached) : null;
   } finally {
@@ -77,21 +73,21 @@ export const fetchISSNow = async () => {
  */
 export const fetchAstros = async () => {
   try {
-    const targetUrl = 'http://api.open-notify.org/astros.json';
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-    const response = await axios.get(proxyUrl, { timeout: 5000 });
-    return JSON.parse(response.data.contents);
+    // DIRECT FETCH
+    const response = await axios.get('https://api.open-notify.org/astros.json', { timeout: 5000 });
+    return response.data;
   } catch (err) {
+    // Professional Expedition 74 Fallback
     return {
       number: 7,
       people: [
         { name: 'Sergey Kud-Sverchkov', craft: 'ISS (Commander)' },
-        { name: 'Sergey Mikayev', craft: 'ISS' },
+        { name: 'Sergei Mikayev', craft: 'ISS' },
         { name: 'Christopher Williams', craft: 'ISS' },
-        { name: 'Jessica Meir', craft: 'ISS' },
-        { name: 'Jack Hathaway', craft: 'ISS' },
-        { name: 'Sophie Adenot', craft: 'ISS' },
-        { name: 'Andrey Fedyaev', craft: 'ISS' }
+        { name: 'Jessica Meir', craft: 'ISS (Crew-12 Commander)' },
+        { name: 'Jack Hathaway', craft: 'ISS (Crew-12 Pilot)' },
+        { name: 'Sophie Adenot', craft: 'ISS (Crew-12 Mission Specialist)' },
+        { name: 'Andrey Fedyaev', craft: 'ISS (Crew-12 Mission Specialist)' }
       ]
     };
   }

@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// Target the Router endpoint for DeepSeek model
-const AI_PROXY_URL = '/api/ai/v1/chat/completions';
-const MODEL_NAME = 'deepseek-ai/DeepSeek-V4-Flash:novita'; 
-
+/**
+ * AI Assistant Service using HuggingFace Inference API (Mistral-7B)
+ * Restricted to dashboard context (RAG-lite)
+ */
 export const getAIResponse = async (userMessage, dashboardData) => {
   const hfToken = import.meta.env.VITE_AI_TOKEN;
 
@@ -11,27 +11,31 @@ export const getAIResponse = async (userMessage, dashboardData) => {
     return "AI service is currently unavailable. Please provide a valid token.";
   }
 
+  // Inject dashboard context into the prompt
   const context = `
     DASHBOARD DATA:
-    - ISS: Lat ${dashboardData.iss?.latitude}, Lon ${dashboardData.iss?.longitude}, Speed ${dashboardData.speed?.toFixed(0)}km/h.
-    - CREW: ${dashboardData.astros?.number} people.
-    - NEWS: ${dashboardData.news?.slice(0, 2).map(n => n.title).join(' | ')}.
+    - ISS Telemetry: Latitude ${dashboardData.iss?.latitude}, Longitude ${dashboardData.iss?.longitude}, Speed ${dashboardData.speed?.toFixed(0)}km/h.
+    - Crew: There are ${dashboardData.astros?.number} astronauts currently on board.
+    - Latest News: ${dashboardData.news?.slice(0, 3).map(n => n.title).join(' | ')}.
     
-    SYSTEM RULE: You are an ISS Assistant. Answer ONLY based on this data. If the answer is not in the data, say "I can only answer based on dashboard data."
+    INSTRUCTION: You are the ISS Intelligent Assistant. You only answer questions using the dashboard data provided above.
+    If a user asks about something not in the data (like weather on Earth, general history, or personal questions), 
+    you must politely state: "I can only answer based on dashboard data."
+    Keep your responses brief and professional.
   `;
 
+  const finalPrompt = `<s>[INST] ${context}\n\nUser Question: ${userMessage} [/INST]`;
+
   try {
-    // Matching User Snippet exactly
     const response = await axios.post(
-      AI_PROXY_URL,
-      { 
-        messages: [
-            {
-                role: "user",
-                content: `Data: ${context}\n\nQuestion: ${userMessage}`,
-            },
-        ],
-        model: MODEL_NAME,
+      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
+      {
+        inputs: finalPrompt,
+        parameters: {
+          max_new_tokens: 250,
+          temperature: 0.7,
+          return_full_text: false
+        }
       },
       {
         headers: {
@@ -41,29 +45,18 @@ export const getAIResponse = async (userMessage, dashboardData) => {
       }
     );
 
-    return response.data.choices?.[0]?.message?.content || "No response received.";
+    // HF Inference API returns an array: [{ generated_text: "..." }]
+    if (response.data && response.data[0] && response.data[0].generated_text) {
+      let content = response.data[0].generated_text;
+      // Clean up any remaining instruction tags if the model leaks them
+      content = content.replace(/\[\/INST\]/g, '').trim();
+      return content;
+    }
+    
+    return "I'm having trouble processing that right now. Please try again.";
 
   } catch (error) {
-    console.error('AI Error Details:', error.response?.data || error.message);
-    
-    // Automatic fallback to V3 if V4-Flash is not recognized yet
-    if (error.response?.status === 400 || error.response?.status === 404) {
-       try {
-           const isProd = import.meta.env.PROD;
-           const API_URL = isProd 
-             ? 'https://router.huggingface.co/v1/chat/completions' 
-             : AI_PROXY_URL;
-
-           const retryRes = await axios.post(API_URL, {
-               messages: [{ role: "user", content: `Data: ${context}\n\nQuestion: ${userMessage}` }],
-               model: "deepseek-ai/DeepSeek-V3:novita" 
-           }, { headers: { 'Authorization': `Bearer ${hfToken.trim()}`, 'Content-Type': 'application/json' } });
-           return retryRes.data.choices?.[0]?.message?.content || "No response.";
-       } catch (e) {
-           return "AI service error. Please ensure the model name is correct.";
-       }
-    }
-
-    return "Connection error. Please check your token.";
+    console.error('AI Inference Error:', error.response?.data || error.message);
+    return "I am currently offline. Please check your connection or AI token.";
   }
 };
