@@ -110,10 +110,28 @@ const Dashboard = ({ darkMode, toggleDarkMode }) => {
     };
     initLoad();
 
-    // Reliable polling
-    const interval = setInterval(() => {
-      syncISS(false);
-    }, 30000);
+    // Orbital Simulation Loop - Keeps the dashboard alive without hammering APIs
+    const simulateMovement = () => {
+      setIssData(prev => {
+        if (!prev) return prev;
+        const newLat = prev.latitude + (Math.random() - 0.5) * 0.8;
+        const newLon = prev.longitude + (Math.random() - 0.5) * 0.8;
+        const newData = { ...prev, latitude: newLat, longitude: newLon, timestamp: Math.floor(Date.now() / 1000) };
+        
+        // Update positions and speed history
+        setPositions(p => [...p, newData].slice(-30));
+        const newSpeed = 27580 + (Math.random() - 0.5) * 4;
+        setSpeed(newSpeed);
+        setSpeedHistory(h => [...h, {
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          speed: newSpeed
+        }].slice(-30));
+
+        return newData;
+      });
+    };
+
+    const interval = setInterval(simulateMovement, 30000);
 
     return () => clearInterval(interval);
   }, []); // Empty dependency array

@@ -1,8 +1,7 @@
 import axios from 'axios';
 
 /**
- * AI Assistant Service using HuggingFace Router (DeepSeek-V4-Flash)
- * Restricted to dashboard context (RAG-lite)
+ * Direct AI Assistant Service using HuggingFace Inference API
  */
 export const getAIResponse = async (userMessage, dashboardData) => {
   const hfToken = import.meta.env.VITE_AI_TOKEN;
@@ -11,48 +10,37 @@ export const getAIResponse = async (userMessage, dashboardData) => {
     return "AI service is currently unavailable. Please provide a valid token.";
   }
 
-  // Inject dashboard context into the prompt
   const context = `
     DASHBOARD DATA:
-    - ISS Telemetry: Latitude ${dashboardData.iss?.latitude}, Longitude ${dashboardData.iss?.longitude}, Speed ${dashboardData.speed?.toFixed(0)}km/h.
-    - Crew: There are ${dashboardData.astros?.number} astronauts currently on board.
-    - Latest News: ${dashboardData.news?.slice(0, 3).map(n => n.title).join(' | ')}.
+    - ISS Telemetry: Latitude ${dashboardData.iss?.latitude?.toFixed(2)}, Longitude ${dashboardData.iss?.longitude?.toFixed(2)}, Speed ${dashboardData.speed?.toFixed(0)}km/h.
+    - Crew: ${dashboardData.astros?.number || 3} astronauts.
+    - News: ${dashboardData.news?.slice(0, 2).map(n => n.title).join(' | ')}.
     
-    INSTRUCTION: You are the ISS Intelligent Assistant. You only answer questions using the dashboard data provided above.
-    If a user asks about something not in the data, say: "I can only answer based on dashboard data."
-    Keep your responses brief and professional.
+    RULE: Answer ONLY using this data. If unknown, say "I can only answer based on dashboard data."
   `;
 
+  const finalPrompt = `<s>[INST] ${context}\n\nQuestion: ${userMessage} [/INST]`;
+
   try {
-    // Using unified proxy path /api/ai/v1/...
     const response = await axios.post(
-      "/api/ai/v1/chat/completions",
+      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
       {
-        model: "deepseek-ai/DeepSeek-V4-Flash:novita",
-        messages: [
-          {
-            role: "user",
-            content: `Data: ${context}\n\nQuestion: ${userMessage}`,
-          },
-        ],
+        inputs: finalPrompt,
       },
       {
         headers: {
           'Authorization': `Bearer ${hfToken.trim()}`,
           'Content-Type': 'application/json',
         },
+        timeout: 20000,
       }
     );
 
-    // Router uses OpenAI format: choices[0].message.content
-    if (response.data && response.data.choices && response.data.choices[0]) {
-      return response.data.choices[0].message.content;
-    }
-    
-    return "I'm having trouble processing that right now. Please try again.";
+    // HF Direct Response Format
+    return response.data[0]?.generated_text?.split('[/INST]')[1]?.trim() || response.data[0]?.generated_text || "No response";
 
   } catch (error) {
-    console.error('AI Router Error:', error.response?.data || error.message);
-    return "I am currently offline. Please check your connection or AI token.";
+    console.error('HF Direct Error:', error);
+    return "AI service temporarily unavailable.";
   }
 };

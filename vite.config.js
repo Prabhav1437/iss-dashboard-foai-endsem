@@ -8,17 +8,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    proxy: {
-      '/api/iss': {
-        target: 'http://api.open-notify.org',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/iss/, ''),
-      },
-      '/api/ai': {
-        target: 'https://router.huggingface.co',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ai/, ''),
-      },
-    },
+    // Direct API connections are used for stability
+    proxy: {}
   },
 });
