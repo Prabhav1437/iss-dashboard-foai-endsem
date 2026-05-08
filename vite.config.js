@@ -15,9 +15,9 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/iss/, ''),
       },
       '/api/ai': {
-        target: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+        target: 'https://api-inference.huggingface.co',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ai/, ''),
+        rewrite: (path) => path.replace(/^\/api\/ai/, '/models/mistralai/Mistral-7B-Instruct-v0.2'),
       },
     },
   },
