@@ -11,12 +11,15 @@ const CACHE_KEY = 'iss_telemetry_cache';
  */
 export const getNearestPlace = async (lat, lon) => {
   try {
-    const res = await axios.get(`https://corsproxy.io/?${encodeURIComponent(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`)}`, { 
-      timeout: 5000
-    });
+    // Switch to allorigins for production-grade proxy reliability
+    const targetUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
     
-    if (res.data.display_name) {
-      const parts = res.data.display_name.split(',');
+    const res = await axios.get(proxyUrl, { timeout: 5000 });
+    const data = JSON.parse(res.data.contents);
+    
+    if (data.display_name) {
+      const parts = data.display_name.split(',');
       return parts.slice(0, 3).join(',').trim();
     }
     return "Over International Waters";
@@ -41,18 +44,21 @@ export const fetchISSNow = async () => {
   lastFetchTime = now;
 
   try {
-    const response = await axios.get(`https://corsproxy.io/?https://api.wheretheiss.at/v1/satellites/25544?t=${Date.now()}`, { 
-      timeout: 8000 
-    });
+    // Adding timestamp for cache busting and using a reliable production proxy
+    const targetUrl = `https://api.wheretheiss.at/v1/satellites/25544?t=${Date.now()}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+    const response = await axios.get(proxyUrl, { timeout: 8000 });
+    const rawData = JSON.parse(response.data.contents);
 
     const data = {
-      latitude: parseFloat(response.data.latitude),
-      longitude: parseFloat(response.data.longitude),
-      timestamp: response.data.timestamp,
-      velocity: response.data.velocity,
-      altitude: response.data.altitude,
-      visibility: response.data.visibility,
-      footprint: response.data.footprint
+      latitude: parseFloat(rawData.latitude),
+      longitude: parseFloat(rawData.longitude),
+      timestamp: rawData.timestamp,
+      velocity: rawData.velocity,
+      altitude: rawData.altitude,
+      visibility: rawData.visibility,
+      footprint: rawData.footprint
     };
 
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
@@ -67,11 +73,14 @@ export const fetchISSNow = async () => {
 };
 
 /**
+ * Fetches current astronauts with professional Expedition 74 fallback
  */
 export const fetchAstros = async () => {
   try {
-    const response = await axios.get('https://corsproxy.io/?http://api.open-notify.org/astros.json', { timeout: 5000 });
-    return response.data;
+    const targetUrl = 'http://api.open-notify.org/astros.json';
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    const response = await axios.get(proxyUrl, { timeout: 5000 });
+    return JSON.parse(response.data.contents);
   } catch (err) {
     return {
       number: 7,

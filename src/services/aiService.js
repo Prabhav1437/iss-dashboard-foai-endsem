@@ -49,7 +49,12 @@ export const getAIResponse = async (userMessage, dashboardData) => {
     // Automatic fallback to V3 if V4-Flash is not recognized yet
     if (error.response?.status === 400 || error.response?.status === 404) {
        try {
-           const retryRes = await axios.post(AI_PROXY_URL, {
+           const isProd = import.meta.env.PROD;
+           const API_URL = isProd 
+             ? 'https://router.huggingface.co/v1/chat/completions' 
+             : AI_PROXY_URL;
+
+           const retryRes = await axios.post(API_URL, {
                messages: [{ role: "user", content: `Data: ${context}\n\nQuestion: ${userMessage}` }],
                model: "deepseek-ai/DeepSeek-V3:novita" 
            }, { headers: { 'Authorization': `Bearer ${hfToken.trim()}`, 'Content-Type': 'application/json' } });
