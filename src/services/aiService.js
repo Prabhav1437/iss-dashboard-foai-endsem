@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /**
- * AI Assistant Service using HuggingFace Inference API (Mistral-7B)
+ * AI Assistant Service using HuggingFace Router (DeepSeek-V4-Flash)
  * Restricted to dashboard context (RAG-lite)
  */
 export const getAIResponse = async (userMessage, dashboardData) => {
@@ -19,23 +19,22 @@ export const getAIResponse = async (userMessage, dashboardData) => {
     - Latest News: ${dashboardData.news?.slice(0, 3).map(n => n.title).join(' | ')}.
     
     INSTRUCTION: You are the ISS Intelligent Assistant. You only answer questions using the dashboard data provided above.
-    If a user asks about something not in the data (like weather on Earth, general history, or personal questions), 
-    you must politely state: "I can only answer based on dashboard data."
+    If a user asks about something not in the data, say: "I can only answer based on dashboard data."
     Keep your responses brief and professional.
   `;
 
-  const finalPrompt = `<s>[INST] ${context}\n\nUser Question: ${userMessage} [/INST]`;
-
   try {
+    // Using unified proxy path /api/ai/v1/...
     const response = await axios.post(
-      "/api/ai",
+      "/api/ai/v1/chat/completions",
       {
-        inputs: finalPrompt,
-        parameters: {
-          max_new_tokens: 250,
-          temperature: 0.7,
-          return_full_text: false
-        }
+        model: "deepseek-ai/DeepSeek-V4-Flash:novita",
+        messages: [
+          {
+            role: "user",
+            content: `Data: ${context}\n\nQuestion: ${userMessage}`,
+          },
+        ],
       },
       {
         headers: {
@@ -45,18 +44,15 @@ export const getAIResponse = async (userMessage, dashboardData) => {
       }
     );
 
-    // HF Inference API returns an array: [{ generated_text: "..." }]
-    if (response.data && response.data[0] && response.data[0].generated_text) {
-      let content = response.data[0].generated_text;
-      // Clean up any remaining instruction tags if the model leaks them
-      content = content.replace(/\[\/INST\]/g, '').trim();
-      return content;
+    // Router uses OpenAI format: choices[0].message.content
+    if (response.data && response.data.choices && response.data.choices[0]) {
+      return response.data.choices[0].message.content;
     }
     
     return "I'm having trouble processing that right now. Please try again.";
 
   } catch (error) {
-    console.error('AI Inference Error:', error.response?.data || error.message);
+    console.error('AI Router Error:', error.response?.data || error.message);
     return "I am currently offline. Please check your connection or AI token.";
   }
 };

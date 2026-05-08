@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/ai",
-      "destination": "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+      "source": "/api/ai/(.*)",
+      "destination": "https://router.huggingface.co/$1"
     },
     {
       "source": "/(.*)",
