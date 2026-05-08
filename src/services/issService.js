@@ -70,3 +70,9 @@ export const calculateDistance = (lat1, lon1, lat2, lon2) => {
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
+export const calculateSpeed = (pos1, pos2) => {
+  if (!pos1 || !pos2) return 0;
+  const distance = calculateDistance(pos1.latitude, pos1.longitude, pos2.latitude, pos2.longitude);
+  const timeDiff = (pos2.timestamp - pos1.timestamp) / 3600;
+  return timeDiff > 0 ? distance / timeDiff : 0;
+};
