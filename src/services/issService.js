@@ -1,6 +1,9 @@
 import axios from 'axios';
 
 const CACHE_KEY = 'iss_telemetry_cache';
+const CACHE_TIME_KEY = 'iss_cache_time';
+const MIN_CACHE_AGE = 60000; // 60 seconds minimum between API calls to prevent rate limiting
+const RATE_LIMIT_RETRY_DELAY = 300000; // 5 minutes wait after 429
 
 const FALLBACK_ISS = {
   latitude: 28.6139,
@@ -21,12 +24,23 @@ export const getNearestPlace = async (lat, lon) => {
 };
 
 /**
- * Fetches current ISS position once or provides simulated movement
+ * Fetches current ISS position with intelligent caching to prevent rate limiting
  */
 export const fetchISSNow = async () => {
   try {
+    // Check cache age - prevent API calls too frequently
+    const cacheTime = parseInt(localStorage.getItem(CACHE_TIME_KEY) || '0');
+    const now = Date.now();
+    const cacheAge = now - cacheTime;
+
+    // If cache is fresh enough, return cached data
+    if (cacheAge < MIN_CACHE_AGE && cacheTime > 0) {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) return JSON.parse(cached);
+    }
+
     const response = await axios.get(`https://api.wheretheiss.at/v1/satellites/25544`, { 
-      timeout: 3000 
+      timeout: 5000 
     });
 
     const data = {
@@ -40,8 +54,12 @@ export const fetchISSNow = async () => {
     };
 
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_TIME_KEY, now.toString());
     return data;
   } catch (error) {
+    if (error.response?.status === 429) {
+      console.warn('ISS API rate limited. Returning cached data.');
+    }
     const cached = localStorage.getItem(CACHE_KEY);
     return cached ? JSON.parse(cached) : FALLBACK_ISS;
   }

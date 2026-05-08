@@ -14,7 +14,8 @@ import Chatbot from '../components/Chatbot';
 import Loader from '../components/Loader';
 import { RefreshCw, Zap, Globe, Radio } from 'lucide-react';
 
-const ISS_REFRESH_INTERVAL = 15000; // 15 seconds
+const ISS_REFRESH_INTERVAL = 15000; // 15 seconds (simulation only, API calls throttled at service level)
+let lastSyncTime = 0; // Track last real API sync time
 
 const Dashboard = ({ darkMode, toggleDarkMode }) => {
   const [issData, setIssData] = useState(null);
@@ -37,6 +38,16 @@ const Dashboard = ({ darkMode, toggleDarkMode }) => {
 
   // ── Unified Fetch Logic ──────────────────────────────────────────────────
   const syncISS = async (showToast = false) => {
+    // Debounce API calls: prevent calling fetchISSNow more than once per 60 seconds
+    const now = Date.now();
+    if (lastSyncTime > 0 && now - lastSyncTime < 60000) {
+      // Return last cached data without making new API call
+      const cached = localStorage.getItem('iss_telemetry_cache');
+      if (cached) return JSON.parse(cached);
+      return;
+    }
+    lastSyncTime = now;
+
     const data = await fetchISSNow();
     if (!data) return;
 
